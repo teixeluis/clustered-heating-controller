@@ -18,12 +18,11 @@ current_power = 0
 remaining_power = 0
 power_report_time = 0
 
-curr_state = 0 # 0 = Idle, 1 = Heat, 2 = Heating, 3 = Chill
-sensed_state = 0  # State according to the current sensor
-
+curr_state = 0 # 0 = Idle, 1 = Grace Heat, 2 = Heat, 3 = Heating, 4 = Chill
 
 REPORT_PERIOD = 5
 WAIT_PERIOD = 10
+GRACE_HEAT_PERIOD = 60000
 HEATER_POWER = 2000
 
 def temperature_mode()
@@ -83,7 +82,7 @@ def start_heat(cmd, idx, payload, payload_json)
     if ! tasmota.get_switches()[0]
         tasmota.set_timer(0, /->toggle_power())
     else
-
+        # Cycle the power to make sure in the next step we set to the intended heat level:
         tasmota.set_timer(0, /->toggle_power())
         tasmota.set_timer(50, /->toggle_power())
     end
@@ -102,8 +101,12 @@ end
 
 def stop_heat()
     tasmota.set_timer(0,/->set_heater_state(0))
-    tasmota.set_timer(500, /->toggle_power())
 
+    # Only turn off if the power is on:
+    if tasmota.get_switches()[0]
+        tasmota.set_timer(50, /->toggle_power())
+    end
+    
     tasmota.resp_cmnd_done()
 end
 
@@ -172,7 +175,7 @@ def reserve_heat()
     mqtt.publish("cmnd/heaters/HeatRequest", '{ "HeatReqTime": ' +  str(tasmota.rtc().find("local")) + ', "HeatReqId": "'  + tasmota.wifi().find("mac") + '", "HeatReqState": 0 }')
 
     if curr_state > 0
-        curr_state = 1
+        curr_state = 2
     end
 end
 
@@ -181,7 +184,7 @@ def reserve_chill()
     mqtt.publish("cmnd/heaters/ChillRequest", '{ "ChillReqTime":' +  str(tasmota.rtc().find("local")) + ', "ChillReqId": "'  + tasmota.wifi().find("mac") + '", "ChillReqState": 0 }')
 
     if curr_state > 0
-        curr_state = 3
+        curr_state = 4
     end
 end
 
@@ -192,13 +195,13 @@ def commit_heat()
     var last_heat_req_age = curr_time - last_heat_req_local_time
     var last_power_report_age = curr_time - power_report_time
 
-    if curr_state == 1 && remaining_power > HEATER_POWER && last_power_report_age < REPORT_PERIOD && ( last_heat_req_state < 1 || (last_heat_req_state > 0 && last_heat_req_age > WAIT_PERIOD))
+    if curr_state == 2 && remaining_power > HEATER_POWER && last_power_report_age < REPORT_PERIOD && ( last_heat_req_state < 1 || (last_heat_req_state > 0 && last_heat_req_age > WAIT_PERIOD))
         mqtt.publish("cmnd/heaters/HeatRequest", '{ "HeatReqTime": ' +  str(curr_time) + ', "HeatReqId": "'  + tasmota.wifi().find("mac") + '", "HeatReqState": 1 }')
 
         # Enable the heater:
         set_heater_state(1)
 
-        curr_state = 2
+        curr_state = 3
     end
 end
 
@@ -209,13 +212,13 @@ def commit_chill()
     var last_chill_req_age = curr_time - last_chill_req_local_time
     var last_power_report_age = curr_time - power_report_time
 
-    if curr_state == 3 && remaining_power <= 0 && last_power_report_age < REPORT_PERIOD && ( last_chill_req_state < 1 || (last_chill_req_state > 0 && last_chill_req_age > WAIT_PERIOD))
+    if curr_state == 4 && remaining_power <= 0 && last_power_report_age < REPORT_PERIOD && ( last_chill_req_state < 1 || (last_chill_req_state > 0 && last_chill_req_age > WAIT_PERIOD))
         mqtt.publish("cmnd/heaters/ChillRequest", '{ "ChillReqTime":' +  str(curr_time) + ', "ChillReqId": "'  + tasmota.wifi().find("mac") + '", "ChillReqState": 1 }')
 
         # Disable the heater:
         set_heater_state(0)
 
-        curr_state = 1
+        curr_state = 2
     end
 end
 
@@ -224,7 +227,7 @@ end
 def request_heat()
     print("request_heat: doing request_heat")
 
-    if curr_state > 0
+    if curr_state == 2
         # Check if enough time went by since another device requested heat:
 
         var curr_time = tasmota.rtc().find("local")
@@ -244,10 +247,9 @@ end
 def request_chill()
     print("request_chill: doing request_chill")
 
-    if curr_state > 0
+    if curr_state == 3
         var curr_time = tasmota.rtc().find("local")
         
-        # TODO add sensed state
         if remaining_power <= 0 && curr_time - last_chill_req_local_time > WAIT_PERIOD
             var delay = math.rand() % 10000
 
@@ -263,12 +265,18 @@ def subscribe_mqtt()
   mqtt.subscribe("cmnd/heaters/ChillRequest", on_chill_request)
 end
 
+def on_grace_heat_end()
+    tasmota.set_timer(0, /->set_heater_state(0))
+    curr_state = 2
+end
+
 def on_power_toggle(value)
     print("on_power_toggle: switch current state: ", value)
 
     if value == "ON"
         tasmota.set_timer(0, /->set_heater_state(1))
-        curr_state = 1
+        tasmota.set_timer(GRACE_HEAT_PERIOD, /-> on_grace_heat_end())
+        curr_state = 1 # Switch to grace heat after the heat is manually turned on
     else
         tasmota.set_timer(0, /->set_heater_state(0))  
         curr_state = 0
