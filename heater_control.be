@@ -1,6 +1,7 @@
 import mqtt
 import json
 import math
+import string
 
 target_temp = 19
 
@@ -20,10 +21,91 @@ power_report_time = 0
 
 curr_state = 0 # 0 = Idle, 1 = Grace Heat, 2 = Heat, 3 = Heating, 4 = Chill
 
-REPORT_PERIOD = 5
-WAIT_PERIOD = 10
-GRACE_HEAT_PERIOD = 60000
-HEATER_POWER = 2000
+curr_heater_power = 0
+
+heaters = map()
+
+REPORT_PERIOD = 2
+WAIT_PERIOD = 3
+SENSOR_PERIOD = 2
+#GRACE_HEAT_PERIOD = 60000
+GRACE_HEAT_PERIOD = 10000
+#STATE_PUB_PERIOD = 60
+STATE_PUB_PERIOD = 5
+DOZE_DEAD_BAND = 1000
+DOZE_CYCLE = 60000
+
+HEATER_MAX_POWER = 1000
+MIN_RELEVANT_POWER = 100
+
+STATE_MAX_AGE = 120
+
+
+class state_report
+    var time, mac, state, order_num
+
+    def init(time, mac, state, order_num)
+        self.time = time
+        self.mac = mac
+        self.state = state
+        self.order_num = order_num
+    end
+end
+
+### Utility functions:
+
+def order_from_mac(mac)
+    var mac_suffix = string.replace(string.split(mac, 6)[1],":","")
+
+    return bytes(mac_suffix).get(0,-4)
+end
+
+def bubble_sort(entries)
+    for i: 0..size(entries) - 1
+        var swapped = false
+        
+        for j: 0..(size(entries) - i - 2)
+            if order_from_mac(entries[j].mac) > order_from_mac(entries[j+1].mac)
+                var temp = entries[j]
+                entries[j] = entries[j+1]
+                entries[j+1] = temp
+        
+                swapped = true
+            end
+        end
+
+        if ! swapped
+            break
+        end
+    end
+end
+
+def recalculate_order()
+    var entries = []
+
+    # Populate the list:
+    for k: heaters.keys()
+        entries.push(heaters.item(k))
+    end
+
+    #entries = quick_sort(entries, 0, nil)
+    bubble_sort(entries)
+
+    # Update the heaters status map with the order number of each entry
+    for i: 0..(size(entries) - 1)
+        entries[i].order_num = i
+        heaters.setitem(entries[i].mac, entries[i])
+    end
+end
+
+def print_state_table()
+    for k: heaters.keys()
+        var heater = heaters.item(k)
+        print("print_state_table: time: ", str(heater.time), "; mac: ", heater.mac, "; state: ", str(heater.state), "; order_num: ", str(heater.order_num))
+    end
+end
+
+### Feature functions:
 
 def temperature_mode()
     tasmota.cmd('IRSend {"Protocol":"NEC","Bits":32,"Data":"0x01FE20DF"}')
@@ -69,6 +151,10 @@ def set_heater_state(state)
     tasmota.cmd('Power1 ' + str(state))
 end
 
+def set_curr_state(state)
+    curr_state = state
+end
+
 def start_heat(cmd, idx, payload, payload_json)
     #var temperature = 22
     #var duration = 1
@@ -87,14 +173,12 @@ def start_heat(cmd, idx, payload, payload_json)
         tasmota.set_timer(50, /->toggle_power())
     end
 
-    # Set to full power:
+    # Set to the desired power level:
     tasmota.set_timer(100, /->toggle_heat_mode())
-    tasmota.set_timer(200, /->toggle_heat_mode())
+    #tasmota.set_timer(200, /->toggle_heat_mode())
 
     #tasmota.set_timer(500, /->set_new_temperature(temperature))
     tasmota.set_timer(300, /->set_heater_state(1))
-
-    #tasmota.set_timer(2500, /->set_timer(duration))
     
     tasmota.resp_cmnd_done()
 end
@@ -195,7 +279,7 @@ def commit_heat()
     var last_heat_req_age = curr_time - last_heat_req_local_time
     var last_power_report_age = curr_time - power_report_time
 
-    if curr_state == 2 && remaining_power > HEATER_POWER && last_power_report_age < REPORT_PERIOD && ( last_heat_req_state < 1 || (last_heat_req_state > 0 && last_heat_req_age > WAIT_PERIOD))
+    if curr_state == 2 && remaining_power > curr_heater_power && last_power_report_age < REPORT_PERIOD && ( last_heat_req_state < 1 || (last_heat_req_state > 0 && last_heat_req_age > WAIT_PERIOD))
         mqtt.publish("cmnd/heaters/HeatRequest", '{ "HeatReqTime": ' +  str(curr_time) + ', "HeatReqId": "'  + tasmota.wifi().find("mac") + '", "HeatReqState": 1 }')
 
         # Enable the heater:
@@ -232,9 +316,9 @@ def request_heat()
 
         var curr_time = tasmota.rtc().find("local")
 
-        if remaining_power > HEATER_POWER && curr_time - last_heat_req_local_time > WAIT_PERIOD
+        if remaining_power > curr_heater_power && curr_time - last_heat_req_local_time > WAIT_PERIOD
             # Give it a random delay in order to give opportunity to other heaters:
-            var delay = math.rand() % 10000
+            var delay = math.rand() % (REPORT_PERIOD * 1000)
 
             tasmota.set_timer(delay, /-> reserve_heat())
             tasmota.set_timer(delay + WAIT_PERIOD * 1000, /-> commit_heat())
@@ -251,7 +335,7 @@ def request_chill()
         var curr_time = tasmota.rtc().find("local")
         
         if remaining_power <= 0 && curr_time - last_chill_req_local_time > WAIT_PERIOD
-            var delay = math.rand() % 10000
+            var delay = math.rand() % (REPORT_PERIOD * 1000)
 
             tasmota.set_timer(delay, /-> reserve_chill())
             tasmota.set_timer(delay + WAIT_PERIOD * 1000, /-> commit_chill())
@@ -259,42 +343,147 @@ def request_chill()
     end
 end
 
-def subscribe_mqtt()
-  mqtt.subscribe("tele/heaters/PowerReport", on_power_report)
-  mqtt.subscribe("cmnd/heaters/HeatRequest", on_heat_request)
-  mqtt.subscribe("cmnd/heaters/ChillRequest", on_chill_request)
+def publish_state()
+    mqtt.publish('cmnd/heaters/StateReport', '{ "Time": ' +  str(tasmota.rtc().find("local")) + ', "Mac": "'  + tasmota.wifi().find("mac") + '", "State": ' + str(curr_state) + '}')
+end
+
+def read_power_sensor()
+    var sensors = json.load(tasmota.read_sensors())
+    var power = sensors['ANALOG']['CTEnergy1']['Power']
+
+    var power_val = real(power)
+
+    if power_val != nil && power_val > MIN_RELEVANT_POWER
+        curr_heater_power = power_val
+    end
+end
+
+def on_doze_cron()
+    print("on_doze_cron: doze mode triggered for this heater.")
+
+    if curr_state > 1
+        tasmota.set_timer(0, /->set_heater_state(0))
+        set_curr_state(0)
+        tasmota.set_timer((DOZE_CYCLE / size(heaters)) - DOZE_DEAD_BAND, def () set_curr_state(2) end)
+    end
+end
+
+def set_doze_cron()
+    var this_mac = tasmota.wifi().find("mac")
+
+    if heaters.contains(this_mac)
+        var this_heater = heaters.item(this_mac)
+
+        tasmota.remove_cron("doze_cron")
+
+        # if power margin is low we assume that cycling between heaters is required:
+        if remaining_power < curr_heater_power
+            #tasmota.add_cron("0 " + str((60 * this_heater.order_num) / size(heaters)) + " * * * *", /-> on_doze_cron(), "doze_cron")
+            tasmota.add_cron(str((60 * this_heater.order_num) / size(heaters)) + " * * * * *", /-> on_doze_cron(), "doze_cron")
+        end
+    end
+end
+
+def on_state_report(topic, idx, payload_s, payload_b)
+    var payload_json = json.load(payload_s)
+
+    print("on_state_report: ", payload_s)
+
+    var time = payload_json.find("Time")
+    var mac = payload_json.find("Mac")
+    var state = payload_json.find("State")
+
+    var state_report = state_report(time, mac, state, -1)
+
+    if ! heaters.contains(mac)
+        heaters.insert(mac, state_report)
+    else
+        heaters.setitem(mac, state_report)
+    end
+
+    # Search if there are entries older than a certain age
+    # and remove these.
+
+    var curr_time = tasmota.rtc().find("local")
+
+    for k: heaters.keys()
+        var heater = heaters.item(k)
+        if curr_time - heater.time > STATE_MAX_AGE
+            heaters.remove(k)
+        end
+    end
+    
+    # Recalculate the order number of each device in the map:
+
+    recalculate_order()
+
+    for k: heaters.keys()
+        var heater = heaters.item(k)
+        print("on_state_report: time: ", str(heater.time), "; mac: ", heater.mac, "; state: ", str(heater.state), "; order_num: ", str(heater.order_num))
+    end
+
+    # Redefine the cron for when this heater enters doze mode:
+
+    if curr_state > 1
+        tasmota.set_timer(0, /->set_doze_cron())
+    end
+
+    return true
 end
 
 def on_grace_heat_end()
-    tasmota.set_timer(0, /->set_heater_state(0))
+    set_heater_state(0)
     curr_state = 2
+end
+
+def activate_heater()
+    tasmota.set_timer(GRACE_HEAT_PERIOD, /-> on_grace_heat_end())
+    tasmota.add_cron("*/" + str(STATE_PUB_PERIOD) + " * * * * *", /-> publish_state(), "publish_state")
+    tasmota.add_cron("*/" + str(REPORT_PERIOD) + " * * * * *", /-> request_heat(), "request_heat")
+    tasmota.add_cron("*/" + str(REPORT_PERIOD) + " * * * * *", /-> request_chill(), "request_chill")
+    tasmota.add_cron("*/" + str(SENSOR_PERIOD) + " * * * * *", /-> read_power_sensor(), "read_power_sensor")
+
+    mqtt.subscribe("tele/heaters/PowerReport", on_power_report)
+    mqtt.subscribe("cmnd/heaters/HeatRequest", on_heat_request)
+    mqtt.subscribe("cmnd/heaters/ChillRequest", on_chill_request)
+    mqtt.subscribe("cmnd/heaters/StateReport", on_state_report)
+
+    set_heater_state(1)
+    curr_state = 1 # Switch to grace heat after the heat is manually turned on
+end
+
+def deactivate_heater()
+    set_heater_state(0)
+    curr_state = 0
+
+    mqtt.unsubscribe("tele/heaters/PowerReport")
+    mqtt.unsubscribe("cmnd/heaters/HeatRequest")
+    mqtt.unsubscribe("cmnd/heaters/ChillRequest")
+    mqtt.unsubscribe("cmnd/heaters/StateReport")
+    tasmota.remove_cron("request_heat")
+    tasmota.remove_cron("request_chill")
+    tasmota.remove_cron("doze_cron")
+    tasmota.remove_cron("publish_state")
+    tasmota.remove_cron("read_power_sensor")
+
+    curr_heater_power = 0
 end
 
 def on_power_toggle(value)
     print("on_power_toggle: switch current state: ", value)
 
     if value == "ON"
-        tasmota.set_timer(0, /->set_heater_state(1))
-        tasmota.set_timer(GRACE_HEAT_PERIOD, /-> on_grace_heat_end())
-        curr_state = 1 # Switch to grace heat after the heat is manually turned on
+        tasmota.set_timer(0, /-> activate_heater())
     else
-        tasmota.set_timer(0, /->set_heater_state(0))  
-        curr_state = 0
+        tasmota.set_timer(0, /-> deactivate_heater())
     end
 end
 
-
 # Commands:
 
-tasmota.add_cmd('StartHeat', start_heat)
-tasmota.add_cmd('StopHeat', stop_heat)
+tasmota.add_cmd('StartHeat', /-> start_heat())
+tasmota.add_cmd('StopHeat', /-> stop_heat())
 
 # Rules:
 
-tasmota.add_rule("MQTT#Connected=1", subscribe_mqtt)
 tasmota.add_rule("Switch1#Action", def (value) on_power_toggle(value) end )
-
-# Cron triggers:
-
-tasmota.add_cron("*/" + str(REPORT_PERIOD) + " * * * * *", /-> request_heat(), "request_heat")
-tasmota.add_cron("*/" + str(REPORT_PERIOD) + " * * * * *", /-> request_chill(), "request_chill")
