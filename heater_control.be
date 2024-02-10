@@ -22,6 +22,7 @@ power_report_time = 0
 curr_state = 0 # 0 = Idle, 1 = Grace Heat, 2 = Heat, 3 = Heating, 4 = Chill
 
 curr_heater_power = 0
+curr_heater_level = 0
 
 heaters = map()
 
@@ -37,9 +38,11 @@ DOZE_CYCLE = 60000
 
 HEATER_MAX_POWER = 1000
 MIN_RELEVANT_POWER = 100
+HEATER_LEVEL=1  # 0 = no heat; 1 = minimum; 2 = maximum
 
 STATE_MAX_AGE = 120
 
+DEBUG=true
 
 class state_report
     var time, mac, state, order_num
@@ -105,7 +108,7 @@ def print_state_table()
     end
 end
 
-### Feature functions:
+### IR remote commands:
 
 def temperature_mode()
     tasmota.cmd('IRSend {"Protocol":"NEC","Bits":32,"Data":"0x01FE20DF"}')
@@ -147,6 +150,8 @@ def toggle_power()
     tasmota.cmd('IRSend {"Protocol":"NEC","Bits":32,"Data":"0x01FE48B7"}')
 end
 
+### Heater management relay:
+
 def set_heater_state(state)
     tasmota.cmd('Power1 ' + str(state))
 end
@@ -174,9 +179,13 @@ def start_heat(cmd, idx, payload, payload_json)
     end
 
     # Set to the desired power level:
-    tasmota.set_timer(100, /->toggle_heat_mode())
-    #tasmota.set_timer(200, /->toggle_heat_mode())
 
+    for i:1..HEATER_LEVEL
+        tasmota.set_timer(i * 100, /->toggle_heat_mode())
+    end
+
+    curr_heater_level = HEATER_LEVEL
+    
     #tasmota.set_timer(500, /->set_new_temperature(temperature))
     tasmota.set_timer(300, /->set_heater_state(1))
     
@@ -351,10 +360,8 @@ def read_power_sensor()
     var sensors = json.load(tasmota.read_sensors())
     var power = sensors['ANALOG']['CTEnergy1']['Power']
 
-    var power_val = real(power)
-
-    if power_val != nil && power_val > MIN_RELEVANT_POWER
-        curr_heater_power = power_val
+    if power != nil && power > MIN_RELEVANT_POWER
+        curr_heater_power = power
     end
 end
 
@@ -377,7 +384,8 @@ def set_doze_cron()
         tasmota.remove_cron("doze_cron")
 
         # if power margin is low we assume that cycling between heaters is required:
-        if remaining_power < curr_heater_power
+        # TODO consider the state table size and the wifi connection state as well.
+        if size(heaters) > 1 && remaining_power < HEATER_MAX_POWER
             #tasmota.add_cron("0 " + str((60 * this_heater.order_num) / size(heaters)) + " * * * *", /-> on_doze_cron(), "doze_cron")
             tasmota.add_cron(str((60 * this_heater.order_num) / size(heaters)) + " * * * * *", /-> on_doze_cron(), "doze_cron")
         end
@@ -417,9 +425,8 @@ def on_state_report(topic, idx, payload_s, payload_b)
 
     recalculate_order()
 
-    for k: heaters.keys()
-        var heater = heaters.item(k)
-        print("on_state_report: time: ", str(heater.time), "; mac: ", heater.mac, "; state: ", str(heater.state), "; order_num: ", str(heater.order_num))
+    if DEBUG
+        tasmota.set_timer(0, /->print_state_table())
     end
 
     # Redefine the cron for when this heater enters doze mode:

@@ -23,3 +23,8 @@ These messages have the following format:
 
 This provides the current power being consumed by the house in watts, and the power budget
 still available for the heaters.
+
+
+## TODO
+
+ * Improve the doze mode to consider the size of the state table.
