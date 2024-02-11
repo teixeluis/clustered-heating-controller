@@ -22,12 +22,15 @@ power_report_time = 0
 curr_state = 0 # 0 = Idle, 1 = Grace Heat, 2 = Heat, 3 = Heating, 4 = Chill
 
 curr_heater_power = 0
-curr_heater_level = 0
+curr_temperature = -1
+curr_heat_level = -1
+curr_duration = -1
+curr_heat_mode = 0 # 0 = Temperature; 1 = Power
 
 heaters = map()
 
-REPORT_PERIOD = 2
-WAIT_PERIOD = 3
+PWR_RPRT_TIMEOUT = 10
+REQUEST_PERIOD = 4
 SENSOR_PERIOD = 2
 #GRACE_HEAT_PERIOD = 60000
 GRACE_HEAT_PERIOD = 10000
@@ -40,7 +43,9 @@ HEATER_MAX_POWER = 1000
 MIN_RELEVANT_POWER = 100
 HEATER_LEVEL=1  # 0 = no heat; 1 = minimum; 2 = maximum
 
-STATE_MAX_AGE = 120
+#STATE_MAX_AGE = 120
+
+STATE_MAX_AGE = 15
 
 DEBUG=true
 
@@ -138,9 +143,10 @@ def reset_temperature()
     end
 end
 
-def set_new_temperature(temp)
+def set_temperature(temp)
     temperature_mode()
     reset_temperature()
+
     for i:0..temp-19
         tasmota.cmd('IRSend {"Protocol":"NEC","Bits":32,"Data":"0x01FEA05F"}')
     end
@@ -161,15 +167,30 @@ def set_curr_state(state)
 end
 
 def start_heat(cmd, idx, payload, payload_json)
-    #var temperature = 22
-    #var duration = 1
-    
+    var temperature = nil
+    var duration = nil
+    var heat_mode = 1
+    var heat_level = nil
+
     # parse payload
-    #if payload_json != nil && payload_json.find("Temperature") != nil && payload_json.find("Duration")  != nil
-    #    temperature = int(payload_json.find("Temperature"))
-    #    duration = int(payload_json.find("Duration"))
-    #end
-    
+    if payload_json != nil 
+        if  payload_json.find("TargetTemperature") != nil 
+            temperature = int(payload_json.find("TargetTemperature"))
+        end
+
+        if payload_json.find("Duration") != nil
+            duration = int(payload_json.find("Duration"))
+        end
+
+        if payload_json.find("HeatMode") != nil
+            heat_mode = int(payload_json.find("HeatMode"))
+        end
+
+        if payload_json.find("HeatLevel") != nil
+            heat_level = int(payload_json.find("HeatLevel"))
+        end
+    end
+
     if ! tasmota.get_switches()[0]
         tasmota.set_timer(0, /->toggle_power())
     else
@@ -178,16 +199,31 @@ def start_heat(cmd, idx, payload, payload_json)
         tasmota.set_timer(50, /->toggle_power())
     end
 
-    # Set to the desired power level:
+    # Set to the desired operation mode:
 
-    for i:1..HEATER_LEVEL
-        tasmota.set_timer(i * 100, /->toggle_heat_mode())
+    if temperature != nil
+        tasmota.set_timer(500, /->set_temperature(temperature))
+
+        curr_temperature = temperature
+
+        if duration != nil
+            tasmota.set_timer(15000, /->set_timer(duration))
+            curr_duration = duration
+        end       
+    elif heat_mode == 1
+        if heat_level == nil
+            heat_level = HEATER_LEVEL
+        end
+
+        for i:1..heat_level
+            tasmota.set_timer(i * 100, /->toggle_heat_mode())
+        end
+
+        curr_heat_level = heat_level
+        curr_heat_mode = heat_mode
     end
 
-    curr_heater_level = HEATER_LEVEL
-    
-    #tasmota.set_timer(500, /->set_new_temperature(temperature))
-    tasmota.set_timer(300, /->set_heater_state(1))
+    tasmota.set_timer(100, /->set_heater_state(1))
     
     tasmota.resp_cmnd_done()
 end
@@ -267,7 +303,7 @@ def reserve_heat()
     print("reserve_heat: doing reserve_heat")
     mqtt.publish("cmnd/heaters/HeatRequest", '{ "HeatReqTime": ' +  str(tasmota.rtc().find("local")) + ', "HeatReqId": "'  + tasmota.wifi().find("mac") + '", "HeatReqState": 0 }')
 
-    if curr_state > 0
+    if curr_state > 0 && curr_state != 3
         curr_state = 2
     end
 end
@@ -276,7 +312,7 @@ def reserve_chill()
     print("reserve_chill: doing reserve_chill")
     mqtt.publish("cmnd/heaters/ChillRequest", '{ "ChillReqTime":' +  str(tasmota.rtc().find("local")) + ', "ChillReqId": "'  + tasmota.wifi().find("mac") + '", "ChillReqState": 0 }')
 
-    if curr_state > 0
+    if curr_state > 0 && curr_state != 2
         curr_state = 4
     end
 end
@@ -288,7 +324,7 @@ def commit_heat()
     var last_heat_req_age = curr_time - last_heat_req_local_time
     var last_power_report_age = curr_time - power_report_time
 
-    if curr_state == 2 && remaining_power > curr_heater_power && last_power_report_age < REPORT_PERIOD && ( last_heat_req_state < 1 || (last_heat_req_state > 0 && last_heat_req_age > WAIT_PERIOD))
+    if curr_state == 2 && remaining_power > curr_heater_power && last_power_report_age < PWR_RPRT_TIMEOUT && ( last_heat_req_state < 1 || (last_heat_req_state > 0 && last_heat_req_age > REQUEST_PERIOD))
         mqtt.publish("cmnd/heaters/HeatRequest", '{ "HeatReqTime": ' +  str(curr_time) + ', "HeatReqId": "'  + tasmota.wifi().find("mac") + '", "HeatReqState": 1 }')
 
         # Enable the heater:
@@ -305,7 +341,7 @@ def commit_chill()
     var last_chill_req_age = curr_time - last_chill_req_local_time
     var last_power_report_age = curr_time - power_report_time
 
-    if curr_state == 4 && remaining_power <= 0 && last_power_report_age < REPORT_PERIOD && ( last_chill_req_state < 1 || (last_chill_req_state > 0 && last_chill_req_age > WAIT_PERIOD))
+    if curr_state == 4 && remaining_power <= 0 && last_power_report_age < PWR_RPRT_TIMEOUT && ( last_chill_req_state < 1 || (last_chill_req_state > 0 && last_chill_req_age > REQUEST_PERIOD))
         mqtt.publish("cmnd/heaters/ChillRequest", '{ "ChillReqTime":' +  str(curr_time) + ', "ChillReqId": "'  + tasmota.wifi().find("mac") + '", "ChillReqState": 1 }')
 
         # Disable the heater:
@@ -325,12 +361,12 @@ def request_heat()
 
         var curr_time = tasmota.rtc().find("local")
 
-        if remaining_power > curr_heater_power && curr_time - last_heat_req_local_time > WAIT_PERIOD
+        if remaining_power > curr_heater_power && curr_time - last_heat_req_local_time > REQUEST_PERIOD
             # Give it a random delay in order to give opportunity to other heaters:
-            var delay = math.rand() % (REPORT_PERIOD * 1000)
+            var delay = math.rand() % (REQUEST_PERIOD * 300)
 
             tasmota.set_timer(delay, /-> reserve_heat())
-            tasmota.set_timer(delay + WAIT_PERIOD * 1000, /-> commit_heat())
+            tasmota.set_timer(delay + REQUEST_PERIOD * 300, /-> commit_heat())
         end
     end
 end
@@ -343,12 +379,20 @@ def request_chill()
     if curr_state == 3
         var curr_time = tasmota.rtc().find("local")
         
-        if remaining_power <= 0 && curr_time - last_chill_req_local_time > WAIT_PERIOD
-            var delay = math.rand() % (REPORT_PERIOD * 1000)
+        if remaining_power <= 0 && curr_time - last_chill_req_local_time > REQUEST_PERIOD
+            var delay = math.rand() % (REQUEST_PERIOD * 300)
 
             tasmota.set_timer(delay, /-> reserve_chill())
-            tasmota.set_timer(delay + WAIT_PERIOD * 1000, /-> commit_chill())
+            tasmota.set_timer(delay + REQUEST_PERIOD * 300, /-> commit_chill())
         end
+
+        return
+    end
+
+    # Capture timed-out chill requests:
+
+    if curr_state == 4
+        curr_state = 3
     end
 end
 
@@ -446,8 +490,8 @@ end
 def activate_heater()
     tasmota.set_timer(GRACE_HEAT_PERIOD, /-> on_grace_heat_end())
     tasmota.add_cron("*/" + str(STATE_PUB_PERIOD) + " * * * * *", /-> publish_state(), "publish_state")
-    tasmota.add_cron("*/" + str(REPORT_PERIOD) + " * * * * *", /-> request_heat(), "request_heat")
-    tasmota.add_cron("*/" + str(REPORT_PERIOD) + " * * * * *", /-> request_chill(), "request_chill")
+    tasmota.add_cron("*/" + str(REQUEST_PERIOD) + " * * * * *", /-> request_heat(), "request_heat")
+    tasmota.add_cron("*/" + str(REQUEST_PERIOD) + " * * * * *", /-> request_chill(), "request_chill")
     tasmota.add_cron("*/" + str(SENSOR_PERIOD) + " * * * * *", /-> read_power_sensor(), "read_power_sensor")
 
     mqtt.subscribe("tele/heaters/PowerReport", on_power_report)
@@ -467,6 +511,7 @@ def deactivate_heater()
     mqtt.unsubscribe("cmnd/heaters/HeatRequest")
     mqtt.unsubscribe("cmnd/heaters/ChillRequest")
     mqtt.unsubscribe("cmnd/heaters/StateReport")
+
     tasmota.remove_cron("request_heat")
     tasmota.remove_cron("request_chill")
     tasmota.remove_cron("doze_cron")
@@ -486,11 +531,27 @@ def on_power_toggle(value)
     end
 end
 
+
 # Commands:
 
-tasmota.add_cmd('StartHeat', /-> start_heat())
+tasmota.add_cmd('StartHeat', start_heat)
 tasmota.add_cmd('StopHeat', /-> stop_heat())
 
 # Rules:
 
 tasmota.add_rule("Switch1#Action", def (value) on_power_toggle(value) end )
+
+
+# Heater Driver
+
+class DelbaHeater
+    def json_append()
+        var msg = string.format(",\"DelbaHeater\":{\"TargetTemperature\":%i,\"Duration\":%i,\"HeatMode\":%i,\"HeatLevel\":%i}", curr_temperature, curr_duration, curr_heat_mode, curr_heat_level)
+
+        tasmota.response_append(msg)
+    end
+end
+
+delba_heater = DelbaHeater()
+
+tasmota.add_driver(delba_heater)
