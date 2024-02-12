@@ -1,4 +1,4 @@
-# Delba Heater
+# Clustered Heating Controller
 
 ## Overview
 
