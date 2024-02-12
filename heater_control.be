@@ -201,15 +201,14 @@ def start_heat(cmd, idx, payload, payload_json)
 
     # Set to the desired operation mode:
 
-    if temperature != nil
+    if  heat_mode == 0 
+        if temperature == nil
+            temperature = DEFAULT_TEMP
+        end
+
         tasmota.set_timer(500, /->set_temperature(temperature))
 
-        curr_temperature = temperature
-
-        if duration != nil
-            tasmota.set_timer(15000, /->set_timer(duration))
-            curr_duration = duration
-        end       
+        curr_temperature = temperature 
     elif heat_mode == 1
         if heat_level == nil
             heat_level = HEATER_LEVEL
@@ -220,10 +219,15 @@ def start_heat(cmd, idx, payload, payload_json)
         end
 
         curr_heat_level = heat_level
-        curr_heat_mode = heat_mode
     end
 
+    curr_heat_mode = heat_mode
     tasmota.set_timer(100, /->set_heater_state(1))
+
+    if duration != nil
+        tasmota.set_timer(15000, /->set_timer(duration))
+        curr_duration = duration
+    end    
     
     tasmota.resp_cmnd_done()
 end

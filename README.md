@@ -64,6 +64,8 @@ This Berry script provides the following features:
 
 ## Operation
 
+### Control loop
+
 The script expects a message to be periodically (ideally below PWR_RPRT_TIMEOUT seconds) sent to the topic:
 
 ```
@@ -78,13 +80,67 @@ loads are connected to.
 The message has the following structure:
 
 ```
-{ "CurrentPower": integer, "RemainingPower": integer }
+{ 
+  "CurrentPower": integer,
+  "RemainingPower": integer
+}
 ```
 
-Where CurrentPower corresponds to the active power currently being consumed, and RemainingPower is 
+Where `CurrentPower` corresponds to the active power currently being consumed, and `RemainingPower` is 
 the amount of power margin still available before the circuit breaker cuts the power (you may for example define it 
 as the difference between the contracted power and the active power).
 
+
+### Commands
+
+This script exposes two Tasmota commands:
+
+**StartHeat** - this command instructs the heater to start running. The parameters and modes defined 
+via this command map to the Delba heater built in features that are normally called via IR commands.
+
+It takes the following payload:
+
+```
+{ 
+  "HeatMode": integer,
+  "TargetTemperature": integer,
+  "Duration": integer,
+  "HeatLevel": integer
+}
+```
+
+`HeatMode` is the only mandatory parameter, and it specifies if the heater will be running in thermostat mode
+or power mode. All other parameters are optional and context dependent. 
+
+As such, if we want to run the heater in **temperature mode**  we need to pass the following payload:
+
+```
+{ "HeatMode": 0, "TargetTemperature": 23 }
+```
+
+Where `TargetTemperature` is the target temperature in degrees Celsius.
+
+We can also optionally limit the heating duration to 2 hours by passing the argument:
+
+```
+{ "HeatMode": 0, "TargetTemperature": 23, "Duration": 2 }
+```
+
+but if we want to run the heater in **power mode**, we need to provide the following arguments:
+
+```
+{ "HeatMode": 1, "HeatLevel": 1 }
+```
+
+Where `HeatLevel` has the following 3 possible values:
+
+ * 0 - no heating, only the fan recirculating air;
+ * 1 - half power setting (approx. 1000 Watts)
+ * 2 - full power setting (approx. 2000 Watts)
+
+ 
+
+**StopHeat** - commands the heater to stop. This command takes no arguments.
 
 ## Data Model
 
@@ -172,6 +228,8 @@ each heater is running, ensuring even heating across all rooms.
 load('heater_control.be')
 ```
 
+2. Upload the heater_control.be script to the Tasmota device.
+
 ## Configuration
 
 ### Tasmota
@@ -199,7 +257,7 @@ GroupTopic2 heaters
 ### Energy consumption message
 
 For example if you have Home Assistant with an integration to a metering device already in place, you can easily configure
-an automation to report the current power to the heaters:
+an automation to report the power to the heaters:
 
 ```
 - id: power_report
