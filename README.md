@@ -138,7 +138,7 @@ Where `HeatLevel` has the following 3 possible values:
  * 1 - half power setting (approx. 1000 Watts)
  * 2 - full power setting (approx. 2000 Watts)
 
- 
+<br>
 
 **StopHeat** - commands the heater to stop. This command takes no arguments.
 

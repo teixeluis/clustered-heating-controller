@@ -29,6 +29,7 @@ curr_heat_mode = 0 # 0 = Temperature; 1 = Power
 
 heaters = map()
 
+DEFAULT_TEMP=18
 PWR_RPRT_TIMEOUT = 10
 REQUEST_PERIOD = 4
 SENSOR_PERIOD = 2
