@@ -90,6 +90,19 @@ Where `CurrentPower` corresponds to the active power currently being consumed, a
 the amount of power margin still available before the circuit breaker cuts the power (you may for example define it 
 as the difference between the contracted power and the active power).
 
+Based on this information, we have the "error signal" that causes the control loop to take action and 
+force one or more of the nodes (heaters) to change state.
+
+The state machine is described by the diagram below:
+
+<img src="docs/images/clustered-heating-controler-fsm.png" alt="Clustered Heating Controler FSM" width="500"/>
+
+Besides being idle or heating, when the heater is first turned on, it first goes through the "Grace Heat"
+intermediate state, where it is given the chance to turn on the heating element for a while, even if the 
+power budget is overrun during that period. This period can be adjusted through the GRACE_HEAT_PERIOD variable.
+Nevertheless if there are more heaters from the cluster running, one of these will turn itself off to keep
+the power demand below the limit. The reason for this "Grace Heat" state is so that the user can get the 
+perception the heater is running normally and producing heat once it is turned on.
 
 ### Commands
 
@@ -115,7 +128,10 @@ or power mode. All other parameters are optional and context dependent.
 As such, if we want to run the heater in **temperature mode**  we need to pass the following payload:
 
 ```
-{ "HeatMode": 0, "TargetTemperature": 23 }
+{
+  "HeatMode": 0,
+  "TargetTemperature": 23
+}
 ```
 
 Where `TargetTemperature` is the target temperature in degrees Celsius.
@@ -123,13 +139,20 @@ Where `TargetTemperature` is the target temperature in degrees Celsius.
 We can also optionally limit the heating duration to 2 hours by passing the argument:
 
 ```
-{ "HeatMode": 0, "TargetTemperature": 23, "Duration": 2 }
+{
+  "HeatMode": 0,
+  "TargetTemperature": 23,
+  "Duration": 2
+}
 ```
 
 but if we want to run the heater in **power mode**, we need to provide the following arguments:
 
 ```
-{ "HeatMode": 1, "HeatLevel": 1 }
+{
+  "HeatMode": 1,
+  "HeatLevel": 1
+}
 ```
 
 Where `HeatLevel` has the following 3 possible values:
@@ -146,14 +169,18 @@ Where `HeatLevel` has the following 3 possible values:
 
 ### Power Usage messages
 
-The heater relies on the exchange of some messages types via MQTT.
+The heater cluster relies on the exchange of some messages types via MQTT in order to achieve the coordinated operation
+it is designed for.
 
 #### Power consumption report
 
 First there is the above mentioned power report message which is provided by an external system (e.g. Home Assistant).
 
 ```
-{ "CurrentPower": integer, "RemainingPower": integer }
+{
+  "CurrentPower": integer,
+  "RemainingPower": integer
+}
 ```
 
 #### HeatRequest message
@@ -162,7 +189,11 @@ During the operation of each heater, whenever a heater intends to turn its heati
 sends a HeatRequest message to the cmnd/heaters/HeatRequest topic:
 
 ```
-{ "HeatReqTime": integer, "HeatReqId": "FF:FF:FF:FF:FF:FF", "HeatReqState": 0 }
+{
+  "HeatReqTime": integer,
+  "HeatReqId": "FF:FF:FF:FF:FF:FF",
+  "HeatReqState": 0
+}
 ```
 
 This is a preparation message ("HeatReqState": 0 means reservation), and other heaters which haven't yet sent a similar 
@@ -171,7 +202,11 @@ request, will give up and try later.
 A while after this message is sent, there is another similar message which is called a commit message:
 
 ```
-{ "HeatReqTime": integer, "HeatReqId": "FF:FF:FF:FF:FF:FF", "HeatReqState": 1 }
+{
+  "HeatReqTime": integer,
+  "HeatReqId": "FF:FF:FF:FF:FF:FF",
+  "HeatReqState": 1
+}
 ```
 
 When the device sends this message it means there is no turning back, and it just announcing that will turn its heater
@@ -183,7 +218,11 @@ the short term. If yes, it gives up and waits for the next opportunity.
 Similarly to the HeatRequest messages, there is also a ChillRequest that is sent to the cmnd/heaters/ChillRequest
 
 ```
-{ "ChillReqTime": integer , "ChillReqId": "FF:FF:FF:FF:FF:FF", "ChillReqState": 0 }
+{
+  "ChillReqTime": integer,
+  "ChillReqId": "FF:FF:FF:FF:FF:FF",
+  "ChillReqState": 0
+}
 ```
 
 This is the opposite of the HeatRequest message, as it requests the intention to turn off the heater element. The reason
@@ -194,7 +233,11 @@ react to the insufficient power condition at the same time and turn their heat o
 Here there is also a commit message, once the device is set to turn its heater off:
 
 ```
-{ "ChillReqTime": integer , "ChillReqId": "FF:FF:FF:FF:FF:FF", "ChillReqState": 1 }
+{
+  "ChillReqTime": integer,
+  "ChillReqId": "FF:FF:FF:FF:FF:FF",
+  "ChillReqState": 1
+}
 ```
 
 #### StateReport message
@@ -209,7 +252,11 @@ In order to prevent this, each device provides a special status message that is 
 This message looks like the following:
 
 ```
-{ "Time": integer, "Mac": "FF:FF:FF:FF:FF:FF", "State": integer}
+{
+  "Time": integer,
+  "Mac": "FF:FF:FF:FF:FF:FF",
+  "State": integer
+}
 ```
 
 As every device reads this message, each one is able to build and keep up to date a table containing 
