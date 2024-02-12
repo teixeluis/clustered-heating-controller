@@ -199,7 +199,7 @@ Here there is also a commit message, once the device is set to turn its heater o
 
 #### StateReport message
 
-When multiple heaters are running at the margin of the availabe power, without any additional measure, 
+When multiple heaters are running at the margin of the available power, without any additional measure, 
 these would reach a steady state where the same set of heaters would stay on, while one ore more
 of the heaters would stay off until the power budget would change. This means that these heaters
 would get into starvation and not being given the opportunity to heat the room.
@@ -212,12 +212,12 @@ This message looks like the following:
 { "Time": integer, "Mac": "FF:FF:FF:FF:FF:FF", "State": integer}
 ```
 
-As such every device reads this message, allowing each one to keep a table containing the status of each device.
-With this a order number is computed based on the MAC address of each device. This order number allows 
-each device to be assigned a unique timeslot from a given time frame (e.g. 60 minutes).
+As every device reads this message, each one is able to build and keep up to date a table containing 
+the status of each device. With this information a order number is computed based on the MAC address of each device. 
+This order number allows each device to be assigned a unique timeslot for a given time frame (e.g. 60 minutes).
 
 With this timeslot, each device knows that when its time arrived and consumption is at the margin, it
-must turn itself off to give opportunity to another device. With this we even out the overall time that 
+must turn itself off to give opportunity to another device. This way we even out the overall time that 
 each heater is running, ensuring even heating across all rooms.
 
 ## Installation
@@ -269,10 +269,11 @@ an automation to report the power to the heaters:
     - service: mqtt.publish
       data:
         topic: "tele/heaters/PowerReport"
-        payload: '{{ { "CurrentPower": states("sensor.mains_active_power") | int, "RemainingPower": 0 - (states("sensor.mains_active_power") | int) } | tojson }}'
+        payload: '{{ { "CurrentPower": states("sensor.mains_active_power") | int, "RemainingPower": 6900 - (states("sensor.mains_active_power") | int) } | tojson }}'
 ```
 
-The  above automation will publish the power consumption message to the heaters every 5 seconds.
+The  above automation will publish the power consumption message to the heaters every 5 seconds. The 6900 Watts represents 
+the maximum power of the circuit breaker, and can be replaced with the most appropriate for the user scenario.
 
 ## TODO
 
