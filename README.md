@@ -95,7 +95,7 @@ force one or more of the nodes (heaters) to change state.
 
 The state machine is described by the diagram below:
 
-<img src="docs/images/clustered-heating-controler-fsm.png" alt="Clustered Heating Controler FSM" width="500"/>
+<img src="docs/images/clustered-heating-controler-fsm.png" alt="Clustered Heating Controler FSM" width="700"/>
 
 Besides being idle or heating, when the heater is first turned on, it first goes through the "Grace Heat"
 intermediate state, where it is given the chance to turn on the heating element for a while, even if the 
@@ -103,6 +103,19 @@ power budget is overrun during that period. This period can be adjusted through 
 Nevertheless if there are more heaters from the cluster running, one of these will turn itself off to keep
 the power demand below the limit. The reason for this "Grace Heat" state is so that the user can get the 
 perception the heater is running normally and producing heat once it is turned on.
+
+Between the heater announcing that wants to produce heat, and actually committing to turning on the heating
+element and change to the "Heating" state, it stays in the "Request Heat" state. During this state it
+evaluates if there is another heater committing to the "Heating" state, announcing and proceeding to the 
+"Heating" state if that is not the case.
+
+Inversely, while the heater is in the "Heating" state and when the power demand increases and rises above the 
+limit reported in the PowerReport messages, it announces that it wants to cool down, switching to the 
+"Request Chill" state. If no other heater is committing to cool down (turn off its heater element), then
+this heater changes to the "Request Heat" state, announces that change, and turns off its heater element. 
+And with this, the cycle repeats until deactivate_heater() is triggered. The latter can be called 
+due to a user action (pressing the ON/OFF button on the remote, via the StopHeat MQTT command, or due
+to the doze mode being triggered for that heater - which will happen in a round robin fashion for each heater).
 
 ### Commands
 
@@ -300,6 +313,25 @@ Next you need to make sure that each heater is set for the heaters shared topic.
 ```
 GroupTopic2 heaters
 ```
+
+### Variables
+
+The constants declared in uppercase can be relevant to be adjusted by the user. Below is an explanation of each:
+
+|Variable             |Sample value          |Description                                                                                                    |
+|:--------------------|:---------------------|:--------------------------------------------------------------------------------------------------------------|
+|DEFAULT_TEMP         |18                    |Default temperature if none is specified and HeatMode = 0                                                      |
+|PWR_RPRT_TIMEOUT     |10                    |Maximum time in seconds to consider a power report value as valid                                              |
+|REQUEST_PERIOD       |4                     |Time (in seconds) between consecutive Heat or Chill requests                                                   |
+|SENSOR_PERIOD        |2                     |Time (in seconds) between consecutive CT current sensor readings to populate variables                         |
+|GRACE_HEAT_PERIOD    |10000                 |Duration of the grace heat period in seconds.                                                                  |
+|STATE_PUB_PERIOD     |5                     |Time between StateReport messages in seconds.                                                                  |
+|DOZE_DEAD_BAND       |1000                  |Time spacing in milliseconds between finishing a doze period and the next cron schedule                        |
+|DOZE_CYCLE           |60000                 |Duration of the doze cycle which is then split by the number of heaters (milliseconds).                        |
+|HEATER_MAX_POWER     |1000                  |Assumed heater max power (in Watts).                                                                           |
+|MIN_RELEVANT_POWER   |100                   |Minimum measured power to consider a valid reading of when the heater is on.                                   | 
+|HEATER_LEVEL         |1                     |Default heater level (0 = no heat; 1 = minimum; 2 = maximum)                                                   |
+|STATE_MAX_AGE        |15                    |Maximum time a StateReport entry will be kept in the corresponding table by each device, if there is no update.|
 
 ### Energy consumption message
 
