@@ -417,7 +417,7 @@ the duration in hours that is configured for (or -1 if it was not set), and the 
 
 Note: because in this design the ESP32 is unable to obtain the current thermostat settings and other parameters 
 from the heater microcontroller itself, this means that if the user changes a setting via the IR remote control, the
-information presented in the telemetry about the HeatingController will get out of sync. The only status obtained 
+information presented in the telemetry about the HeatingController will not be in sync anymore. The only status obtained 
 directly from the heater is that of the fan via the optocoupler.
 
 
