@@ -10,7 +10,7 @@ allowing users to code complex logic and even device drivers as instructions tha
 the interpreter.
 
 Given the low cost of ESP32 devices, Tasmota and Berry became a very compelling platform to leverage the potential of
-this hardware. In practice, not just allow for the creation of simple rules and configurations like we were used
+this type of hardware. In practice, not just allow for the creation of simple rules and configurations like we were used
 to with previous projects, but also provide an imperative language with objects and closures, and all of this
 available on the edge, without the need to compile and reflash devices in order to add new behaviour or features.
 
@@ -27,17 +27,17 @@ thermostat board, a fan and an IR remote control.
 
 Because the controller I needed to create was too sophisticated to be implemented via Tasmota
 rules, and on the other hand a bit too domain specific to be coded as an integral part of the Tasmota
-firmware, I considered using Berry could be a good idea. And so it was and I don't regret the choice. 
+firmware, I considered that using Berry could be a good idea. And so it was and I don't regret the choice. 
 
 This Berry script should easily be adapted to other types of devices with similar characteristics,
-with this or simila ESP32 based board, as long as it has at least 4 available GPIOS (one being and
-analog input). A relay is also a relevant feature, especially if power or isolated control
+with this or similar ESP32 based boards, as long as it has at least 4 available GPIOS available (see below - 
+one being and analog input). A relay is also a relevant feature, especially if power or isolated control
 of the heater is required.
 
 Together with the ESP32 relay board, I have added a DS18B20 temperature sensor for measuring the air 
-temperature, a analog Current Transformer to monitor the current consumed by each heater, an IR LED for sending 
-commands to the heater (emulating the IR remote control), and an optocoupler to pickup the signal of
-the fan when is on (this way obtaining feedback on the user having turned on the heater).
+temperature, a analog Current Transformer sensor to monitor the current consumed by each heater, 
+an IR LED for sending commands to the heater (emulating the IR remote control), and an optocoupler to 
+pickup the signal of the fan when is on (this way obtaining feedback on the user having turned on the heater).
 
 In this adaptation process I looked forward to be the least invasive as possible to the original
 hardware in order not to have any interference with the safety aspects of the original design, and
