@@ -549,14 +549,14 @@ tasmota.add_rule("Switch1#Action", def (value) on_power_toggle(value) end )
 
 # Heater Driver
 
-class DelbaHeater
+class HeatingController
     def json_append()
-        var msg = string.format(",\"DelbaHeater\":{\"TargetTemperature\":%i,\"Duration\":%i,\"HeatMode\":%i,\"HeatLevel\":%i}", curr_temperature, curr_duration, curr_heat_mode, curr_heat_level)
+        var msg = string.format(",\"HeatingController\":{\"TargetTemperature\":%i,\"Duration\":%i,\"HeatMode\":%i,\"HeatLevel\":%i}", curr_temperature, curr_duration, curr_heat_mode, curr_heat_level)
 
         tasmota.response_append(msg)
     end
 end
 
-delba_heater = DelbaHeater()
+heating_controller = HeatingController()
 
-tasmota.add_driver(delba_heater)
+tasmota.add_driver(heating_controller)

@@ -9,26 +9,38 @@ The support for the Berry language which is included in the Tasmota 32 releases,
 allowing users to code complex logic and even device drivers as instructions that are compiled in runtime by 
 the interpreter.
 
-Given the low cost of ESP32 hardware, I decided to incorporate a dev board of this type (LC Technology AC90V-250V 
-1 Relay ESP32 board) into a set of Delba electric heaters:
+Given the low cost of ESP32 devices, Tasmota and Berry became a very compelling platform to leverage the potential of
+this hardware. In practice, not just allow for the creation of simple rules and configurations like we were used
+to with previous projects, but also provide an imperative language with objects and closures, and all of this
+available on the edge, without the need to compile and reflash devices in order to add new behaviour or features.
+
+I decided to incorporate a dev board of this type (LC Technology AC90V-250V 1 Relay ESP32 board) into a set 
+of Delba electric heaters:
 
 https://templates.blakadder.com/ESP32_Relay_AC_X1.html
 
 
-These are pretty conventional ceramic heater devices, which feature the PTC
-heater elements, an electronic thermostat board, a fan and an IR remote control.
+These are pretty conventional ceramic heater devices, which feature the PTCheater elements, an electronic 
+thermostat board, a fan and an IR remote control.
 
 <img src="docs/images/delba_heater.jpg" alt="Delba Heater" width="500"/>
 
-This script should easily be adapted to other types of devices using this type of relay board.
+Because the controller I needed to create was too sophisticated to be implemented via Tasmota
+rules, and on the other hand a bit too domain specific to be coded as an integral part of the Tasmota
+firmware, I considered using Berry could be a good idea. And so it was and I don't regret the choice. 
 
-Besides the relay board, I have added a DS18B20 temperature sensor (for measuring the air temperature), 
-a analog Current Transformer to monitor the current consumed by each heater, an IR LED for sending 
+This Berry script should easily be adapted to other types of devices with similar characteristics,
+with this or simila ESP32 based board, as long as it has at least 4 available GPIOS (one being and
+analog input). A relay is also a relevant feature, especially if power or isolated control
+of the heater is required.
+
+Together with the ESP32 relay board, I have added a DS18B20 temperature sensor for measuring the air 
+temperature, a analog Current Transformer to monitor the current consumed by each heater, an IR LED for sending 
 commands to the heater (emulating the IR remote control), and an optocoupler to pickup the signal of
 the fan when is on (this way obtaining feedback on the user having turned on the heater).
 
 In this adaptation process I looked forward to be the least invasive as possible to the original
-hardware, in order not to have any interference with the safety aspects of the original design, and
+hardware in order not to have any interference with the safety aspects of the original design, and
 also not to bring additional failure modes. As such I kept the ESP32 totally isolated from the heater own
 electronics and the communication with its control board is only done via IR signals, and via the optocoupler.
 
@@ -46,7 +58,7 @@ This ESP32 board also has the advantage of having its own SMPS 230 Volt isolated
 <img src="docs/images/ESP32_Relay_AC_X1.webp" alt="ESP32 Relay board" width="500"/>
 
 This is an advantage if electrical interface with other devices would be required, as the heater control board 
-IS NOT an isolated circuit. To produce the  5 VDC required for operation, it uses a uninsolated DC converter 
+IS NOT an isolated circuit. To produce the 5 VDC required for operation, it uses a uninsolated DC converter 
 chip which converts the mains voltage directly to low voltage DC without galvanic isolation. This is very 
 common in these types of home appliances.
 
@@ -138,7 +150,7 @@ It takes the following payload:
 `HeatMode` is the only mandatory parameter, and it specifies if the heater will be running in thermostat mode
 or power mode. All other parameters are optional and context dependent. 
 
-As such, if we want to run the heater in **temperature mode**  we need to pass the following payload:
+As such, if we want to run the heater in **thermostat mode**  we need to pass the following payload:
 
 ```
 {
@@ -353,6 +365,61 @@ an automation to report the power to the heaters:
 
 The  above automation will publish the power consumption message to the heaters every 5 seconds. The 6900 Watts represents 
 the maximum power of the circuit breaker, and can be replaced with the most appropriate for the user scenario.
+
+
+## Telemetry
+
+Tasmota publishes a telemetry message with the current status of sensors, switches and other devices at regular intervals. This
+interval is configured via the TelePeriod <xx> command, where xx is the number of seconds between telemetry reports.
+
+This code declares a driver which adds the information from the heating controller to this telemetry message.
+
+The message is published to a topic named as:
+
+```
+tele/<heater name>/SENSOR
+```
+
+and the message is something similar to:
+
+```
+{
+    "Time": "2024-02-14T23:06:09",
+    "Switch1": "OFF",
+    "ANALOG": {
+        "CTEnergy1": {
+            "Energy": 0.559,
+            "Power": 9,
+            "Voltage": 230,
+            "Current": 0.038
+        }
+    },
+    "DS18B20": {
+        "Id": "0000003CD458",
+        "Temperature": 21.8
+    },
+    "HeatingController": {
+        "TargetTemperature": 27,
+        "Duration": 7,
+        "HeatMode": 1,
+        "HeatLevel": 2
+    },
+    "TempUnit": "C"
+}
+```
+
+Of course that the amount of information and values will vary according to what sensors and other peripherals are configured
+in the user device.
+
+In what concerns this script, it exposes the mode the heater is currently set (HeatMode), the power level (HeatLevel), 
+the duration in hours that is configured for (or -1 if it was not set), and the target temperature the thermostat is set to 
+(TargetTemperature).
+
+Note: because in this design the ESP32 is unable to obtain the current thermostat settings and other parameters 
+from the heater microcontroller itself, this means that if the user changes a setting via the IR remote control, the
+information presented in the telemetry about the HeatingController will get out of sync. The only status obtained 
+directly from the heater is that of the fan via the optocoupler.
+
 
 ## TODO
 
