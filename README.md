@@ -441,7 +441,7 @@ requirements assumed by this setup. The ones I am considering are the following:
 ### Integration with the heater
 
 The integration took as an essencial aspect, to be the least invasive as possible, and avoid additional failure modes
-that could but the safety of the device at risk. As such a few basic considerations were:
+that could put the safety of the device at risk. As such a few considerations were taken:
 
  * do not allow power to the heating elements to be overriden by our board or any of the additional circuitry, i.e. our
  circuit may cut the power to the heater, but not turn it on in such way that bypasses the onboard microcontroller
