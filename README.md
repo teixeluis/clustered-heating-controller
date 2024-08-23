@@ -307,18 +307,22 @@ load('heater_control.be')
 ### Tasmota
 
 In Tasmota you need to make sure that the IO ports are correctly configured for the peripherals
-used by this script. I have chosen the following layout:
+used by this script. You can use this template to establish that assignment:
 
 ```
-Module type (ESP32-DevKit)
+{"NAME":"clustered-heater","GPIO":[0,0,0,0,0,0,0,0,0,0,0,0,224,0,0,0,0,0,0,544,0,0,0,1312,0,0,0,0,160,1056,4896,0,0,0,0,0],"FLAG":0,"BASE":1}
+```
 
-ESP32_Relay_AC_X1 (0)
+This corresponds to the following PIN assignments:
 
+```
 IO GPIO27;DS18x20;1
 AO GPIO32;Switch;1
 AO GPIO33;IRsend;1
 IA GPIO34;ADC CT Power;1
 ```
+
+<img src="docs/images/gpio_template.png" alt="GPIO Template" width="400"/>
 
 Next you need to make sure that each heater is set for the heaters shared topic.
 
@@ -420,6 +424,32 @@ from the heater microcontroller itself, this means that if the user changes a se
 information presented in the telemetry about the HeatingController will not be in sync anymore. The only status obtained 
 directly from the heater is that of the fan via the optocoupler.
 
+## Hardware
+
+### Extra components
+
+As you may have guessed by the GPIO pin assignment, besides the "ESP32_Relay_AC_X1" board there are a few more hardware 
+requirements assumed by this setup. The ones I am considering are the following:
+
+ * DS18B20 temperature sensor - provides an independent and accurate reading of the ambient temperature that can 
+ be used to monitor the heater, or for implementing a separate thermostat;
+ * Optoisolator such as the EL817 - the electronics in the heater are at mains potential. We are using this component
+ to obtain the fan signal provided by the onboard microcontroller, while keeping the ESP32 isolated from the mains
+ potential.
+ * IR emitter for sending control signals to the heater (therefore emulating the IR remote control)
+
+### Integration with the heater
+
+The integration took as an essencial aspect, to be the least invasive as possible, and avoid additional failure modes
+that could but the safety of the device at risk. As such a few basic considerations were:
+
+ * do not allow power to the heating elements to be overriden by our board or any of the additional circuitry, i.e. our
+ circuit may cut the power to the heater, but not turn it on in such way that bypasses the onboard microcontroller
+ decision. Only provide subtractive control, but not additive control.
+ * do not bypass or remove any of the thermal protections built into the heater - the latter features a thermal fuse 
+ and a thermal control thermostat;
+ * the ESP32 does not switch the power to the heater elements (in spite of having a mains rated relay), but instead
+ it switches the DC power to the transistors that drive the original onboard relays.
 
 ## TODO
 

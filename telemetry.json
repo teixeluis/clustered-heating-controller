@@ -1,0 +1,23 @@
+{
+    "Time": "2024-02-14T23:06:09",
+    "Switch1": "OFF",
+    "ANALOG": {
+        "CTEnergy1": {
+            "Energy": 0.559,
+            "Power": 9,
+            "Voltage": 230,
+            "Current": 0.038
+        }
+    },
+    "DS18B20": {
+        "Id": "0000003CD458",
+        "Temperature": 21.8
+    },
+    "HeatingController": {
+        "TargetTemperature": 27,
+        "Duration": 7,
+        "HeatMode": 1,
+        "HeatLevel": 2
+    },
+    "TempUnit": "C"
+}
