@@ -440,8 +440,10 @@ requirements assumed by this setup. The ones I am considering are the following:
 
 ### Integration with the heater
 
-The integration took as an essencial aspect, to be the least invasive as possible, and avoid additional failure modes
-that could put the safety of the device at risk. As such a few considerations were taken:
+#### Heater control
+
+For this integration, safety was the first thing to consider. As such, in order to be the least invasive as possible to the original design (avoiding new failure modes
+that could put the safety of the device at risk), the following considerations were taken:
 
  * do not allow power to the heating elements to be overriden by our board or any of the additional circuitry, i.e. our
  circuit may cut the power to the heater, but not turn it on in such way that bypasses the onboard microcontroller
@@ -450,6 +452,70 @@ that could put the safety of the device at risk. As such a few considerations we
  and a thermal control thermostat;
  * the ESP32 does not switch the power to the heater elements (in spite of having a mains rated relay), but instead
  it switches the DC power to the transistors that drive the original onboard relays.
+
+ For this effect you can see below a diagram representing the portion of the Delba heater PCB which controls the power to the fan and the ceramic elements.
+
+ The blue dotted boxes represent the modifications and what portions of the circuit these tap into.
+
+ <img src="docs/heater_mod/heater_modification.png" alt="Heater Modification" width="800"/>
+
+ The first modification is the tap between R1 and pin 19 of the U1 microcontroller. This is used for the ESP32 to know if the fan is ON or OFF (which in turn gives an indication if the user turned the heater on via the remote). More details about the custom board where J2 connects can be found later in this document.
+
+ The second modification consists of having the VCC rail powering the RL1 and RL2 relay coils be switched by the relay that is on the ESP32 board. This provides a safe configuration, where in order for the heater elements to be turned on, both the ESP32 relay and the Q1 and Q2 transistor that drive RL1 and RL2 need to be turned on. This way neither the ESP32 board nor the Delba control board are able to independently turn on the heaters.
+
+ In the board, for the first modification (fan signal), I have drilled two small holes in order to get the wires for the signal and GND soldered through:
+
+<img src="docs/heater_mod/heater_modification_pcb_back.jpg" alt="Modification PCB back" width="800"/>
+
+ Regarding the 2nd modification, I have just removed the shunt wire shown in the image, and put the J3 socket in the same place. This socket then connects to the ESP32 board built-in relay.
+
+<img src="docs/heater_mod/heater_modification_pcb_front.jpg" alt="Modification PCB back" width="800"/>
+
+#### Digital control and status
+
+As mentioned above there is a custom IO board. Its purpose is twofold:
+
+  * Provide a galvanically isolated signal that indicates the fan state to the ESP32;
+  * Provide an optical IR signal for the receiver located in the front of the unit. This enables communication with the heater microcontroller via the interface as the original remote control (standard 38 KHz NEC style signals).
+
+Below is the schematic diagram of the board:
+
+ <img src="docs/adapter_board/io_adapter_board.png" alt="IO Adapter Board" width="600"/>
+
+It simply consists of the EL817 optocoupler for obtaining the feedback from the fan status, and it contains a standard Vishay TSAL6100 IR LED for sending remote control signals to the heater control board. In order to drive the IR LED, a 2N2222 bipolar transistor is used.
+
+In my setup, I have separated the IR LED in a smaller board which I placed closer to the IR receiver for optimal signal coupling:
+
+ <img src="docs/adapter_board/io_adapter_board_install.jpg" alt="IO Adapter Board" width="600"/>
+
+ There is no physical connection to the heater display board that is in the center. The 4-pin connect goes directly to the ESP32 board and it provides power (+5V) to this I/O board, as well as the fan signal and the IR output signal.
+
+#### Sensors
+
+Besides the fan status, I have also consider relevant to include two sources of input data:
+
+ * a temperature sensor (one DS18x20);
+ * a current transformer for sensing the heater element current;
+
+With the first, one can monitor the ambient temperature, allowing to improve the temperature control on top of the built-in thermostat;
+
+With the current transformer, the ESP32 can monitor the operation of the heater and determine in what state is currently in (i.e. off/half power/full power).
+
+As the current transformer, I have used a HW-670 board. This board has a current sensing coil, an LM358, and a few passive components. It is designed to sense a maximum of 5 Amps, but with a small modification I was able to increase its range.
+
+In practice I did three modification to this board in order to satisfy my use case. First is to replace the R11 resistor which originally has a value of 100 Ohm, by a 22 Ohm resistor. This reduces the input signal to the amplifier, therefore increasing the range of the circuit (we need it to measure at least 10 Amps of maximum current).
+
+The other two modifications consist of replacing the 1 uF C6 capacitor, with a generic 1N4148 diode. The same capacitor is then put between the output pin at the J1 connector, and GND. With this modification we rectify the AC waveform and have a positive DC signal suitable for the ESP32 analog input.
+
+ <img src="docs/current_sensor/current_sensor.png" alt="IO Adapter Board" width="600"/>
+
+The replacement of R11 and C6:
+
+<img src="docs/current_sensor/current_sensor_mod_02.jpg" alt="IO Adapter Board" width="500"/>
+
+The addition of C6 in parallel with the output:
+
+<img src="docs/current_sensor/current_sensor_mod_01.jpg" alt="IO Adapter Board" width="500"/>
 
 ## TODO
 
