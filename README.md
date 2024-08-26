@@ -459,15 +459,33 @@ that could put the safety of the device at risk), the following considerations w
 
  <img src="docs/heater_mod/heater_modification.png" alt="Heater Modification" width="800"/>
 
+ I have modified two similar models of the Delba PTC heaters: the Delba DB-614, which is a slightly more "premium" model of the product line:
+
+ <img src="docs/images/delba_heater.jpg" alt="Delba Heater" width="500"/>
+
+ and the DB-821:
+
+  <img src="docs/images/delba_heater-DB-821.jpg" alt="Delba Heater" width="500"/>
+
+ Both are very similar, where the only real difference in the first one is a motorized flap to allow the airflow to be directed.
+ 
+ While the exact layout of the changes were different for each model (because each has a slighly different PCB), I will focus on the modification to the DB-821 as both are equally valid for explaining the concept around these modifications. 
+
  The first modification is the tap between R1 and pin 19 of the U1 microcontroller. This is used for the ESP32 to know if the fan is ON or OFF (which in turn gives an indication if the user turned the heater on via the remote). More details about the custom board where J2 connects can be found later in this document.
 
- The second modification consists of having the VCC rail powering the RL1 and RL2 relay coils be switched by the relay that is on the ESP32 board. This provides a safe configuration, where in order for the heater elements to be turned on, both the ESP32 relay and the Q1 and Q2 transistor that drive RL1 and RL2 need to be turned on. This way neither the ESP32 board nor the Delba control board are able to independently turn on the heaters.
+ The second modification consists of having the VCC rail powering the RL1 and RL2 relay coils be switched by the relay that is on the ESP32 board. This provides a safe configuration, so that for the heater elements to be turned on, both the ESP32 relay and the Q1 and Q2 transistor that drive RL1 and RL2 need to be turned on. This way neither the ESP32 board nor the Delba control board are able to independently turn on the heaters.
 
  In the board, for the first modification (fan signal), I have drilled two small holes in order to get the wires for the signal and GND soldered through:
 
 <img src="docs/heater_mod/heater_modification_pcb_back.jpg" alt="Modification PCB back" width="800"/>
 
- Regarding the 2nd modification, I have just removed the shunt wire shown in the image, and put the J3 socket in the same place. This socket then connects to the ESP32 board built-in relay.
+(the GND and Fan signal wires shown in the image)
+
+ Regarding the 2nd modification, I have just removed the shunt wire shown in the image:
+ 
+ <img src="docs/heater_mod/heater_modification_initial_jumper.jpg" alt="Modification PCB back" width="800"/>
+ 
+ And put the J3 socket in the same place. This socket then connects to the ESP32 board built-in relay.
 
 <img src="docs/heater_mod/heater_modification_pcb_front.jpg" alt="Modification PCB back" width="800"/>
 
