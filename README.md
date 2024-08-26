@@ -492,7 +492,7 @@ In my setup, I have separated the IR LED in a smaller board which I placed close
 
 #### Sensors
 
-Besides the fan status, I have also consider relevant to include two sources of input data:
+Besides the fan status, I have also considered relevant to include two sources of input data:
 
  * a temperature sensor (one DS18x20);
  * a current transformer for sensing the heater element current;
@@ -503,7 +503,7 @@ With the current transformer, the ESP32 can monitor the operation of the heater 
 
 As the current transformer, I have used a HW-670 board. This board has a current sensing coil, an LM358, and a few passive components. It is designed to sense a maximum of 5 Amps, but with a small modification I was able to increase its range.
 
-In practice I did three modification to this board in order to satisfy my use case. First is to replace the R11 resistor which originally has a value of 100 Ohm, by a 22 Ohm resistor. This reduces the input signal to the amplifier, therefore increasing the range of the circuit (we need it to measure at least 10 Amps of maximum current).
+In practice I did three modifications to this board in order to satisfy my use case. First is to replace the R11 resistor which originally has a value of 100 Ohm, by a 22 Ohm resistor. This reduces the input signal to the amplifier, therefore increasing the range of the circuit (we need it to measure at least 10 Amps of maximum current).
 
 The other two modifications consist of replacing the 1 uF C6 capacitor, with a generic 1N4148 diode. The same capacitor is then put between the output pin at the J1 connector, and GND. With this modification we rectify the AC waveform and have a positive DC signal suitable for the ESP32 analog input.
 
