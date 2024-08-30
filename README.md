@@ -370,6 +370,71 @@ an automation to report the power to the heaters:
 The  above automation will publish the power consumption message to the heaters every 5 seconds. The 6900 Watts represents 
 the maximum power of the circuit breaker, and can be replaced with the most appropriate for the user scenario.
 
+### Current sensor calibration
+
+I have chosen to take advantage of the CT POWER mode that can be used in Tasmota on an ADC pin. By configuring correctly the ADC parameters, it automatically calculates the current in Amperes, and it also calculates an approximation of the active power and consumed energy.
+
+However in order for the measurements to be minimally accurate, one needs to find the appropriate calibration values.
+
+While the page:
+
+https://tasmota.github.io/docs/ADC/#commands
+
+provides some indications, it does not detail how to obtain the optimal calibration values.
+
+Considering how the current is calculated in this feature, which is done here:
+
+https://github.com/arendst/Tasmota/blob/1ab9bee3128d737a08817e7e1dafdd300c77bd5f/tasmota/tasmota_xsns_sensor/xsns_02_analog.ino#L714
+
+The following formula is applied:
+
+```
+I = (ADC - param1) * (param2 / 100000);
+```
+
+Where param1 is the minimum ADC reading, and param2 is the multiplier factor. These are the two parameters we need to determine so that the feature can return valid measurements.
+
+For that effect, the approach I came up with was the following:
+
+1. Put the ADC pin in "ADC Input" mode:
+
+![ADC Input mode](docs/images/adc_input_mode.png)
+
+2. Using an AC clamp meter, run the heater in half power mode and take note of both the current measured in the clamp, and the ADC value reported by Tasmota. Allow the values to stabilize before noting these. With the PTC heaters, the current will gradually ramp up until settling in the nominal power level.
+
+![Current Calibration](docs/images/current_calibration.jpg)
+
+3. Repeat the same procedure for full power.
+
+4. Determine param1 and param2 using the two expressions:
+
+```
+param2 = ((I2 - I1) * 100 000) / (ADC2 - ADC1)
+param1 = ADC2 - ((I2 * 100 000) / param2)
+```
+
+For example, considering:
+
+```
+I1 = 4.72
+I2 = 8.18
+
+ADC1 = 2006
+ADC2 = 2125
+```
+
+Using the formulas above we are then able to determine param1 and param2:
+
+```
+param2 = ((8.18 - 4.72) * 100 000) / (2125 - 2006) = 2907.56
+param1 = 2125 - ((8.18 * 100 000) / 2907,56) = 1843.66
+```
+
+We can then add these to the configuration via the following Tasmota command:
+
+```
+adcparam 7,1844,2908,0.23,0.000
+```
 
 ## Telemetry
 
