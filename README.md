@@ -306,6 +306,8 @@ load('heater_control.be')
 
 ### Tasmota
 
+#### Template
+
 In Tasmota you need to make sure that the IO ports are correctly configured for the peripherals
 used by this script. You can use this template to establish that assignment:
 
@@ -324,10 +326,58 @@ IA GPIO34;ADC CT Power;1
 
 <img src="docs/images/gpio_template.png" alt="GPIO Template" width="400"/>
 
+#### MQTT topic
+
 Next you need to make sure that each heater is set for the heaters shared topic.
 
 ```
 GroupTopic2 heaters
+```
+
+#### SwitchMode
+
+SwitchMode determines the behaviour of the switch input. In our circuit we get a high signal when the fan is off, and and low signal when it is on. 
+As such we want to make sure the logical state represented by the Tasmota switch follows the real state of the fan.
+
+For that effect we need to provide the following command to make sure we have the switch in inverted follow (0 = on, 1 = off):
+
+```
+SwitchMode1 2
+```
+
+#### Detach switches from relays and send MQTT messages instead - SetOption114
+
+When the fan is turned on, we don't want our relay to automatically follow that state. It needs to be managed independently. For that effect
+we use this setting:
+
+```
+SetOption114 1
+```
+
+#### Default power state - SetOption0
+
+For safety and control reasons we prefer that our relay first stats in the off state and let the software or the user later decide if heat
+should be turned on. As such: we disable this option:
+
+```
+SetOption0 0
+```
+
+#### Boot loop control - SetOption36
+
+This feature is potentially useful in some cases, but often can cause problems and loss of configuration. As such we disable it as well:
+
+```
+SetOption36 0
+```
+
+
+#### Device recovery using fast power cycle detection - SetOption65
+
+Similarly to the previous, disable this one as well:
+
+```
+SetOption65 1
 ```
 
 ### Variables
