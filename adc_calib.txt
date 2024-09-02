@@ -1,0 +1,139 @@
+adcparam7 1003,740,0.23,0.000
+
+
+2047, 2050
+
+2345 -> 1000
+
+2600 -> 2000
+
+
+adcparam 7,2050,1350,0.23,0.000
+
+4.26 -> 2362
+7.86 -> 2582
+
+---
+
+0.01 - 1579
+0.08 - 1580
+4.230 - 1825
+
+8.06 - 1920
+
+----
+
+No resistor:
+
+ovalesublime-delba-heater-04:
+
+adcparam 7,2050,1435,0.23,0.000
+
+-----
+
+1 MOhm:
+
+0.01 - 1719
+0.22 -  1727
+4.35 - 2012
+8.00 - 2195
+
+
+adcparam 7,1719,1580,0.23,0.000
+
+
+-----
+
+
+ovalesublime-delba-heater-03
+
+16:53:33.677 CMD: status 3
+16:53:33.682 MQT: stat/tasmota_DEF4C8/STATUS3 = {"StatusLOG":{"SerialLog":2,"WebLog":2,"MqttLog":0,"SysLog":0,"LogHost":"","LogPort":514,"SSId":["griffinnet-zh",""],"TelePeriod":300,"Resolution":"558180C0","SetOption":["00008009","2805C80001000600003C5A0A192800000000","00000080","00006000","00004000","00000000"]}}
+
+--
+
+3.3 MOhm
+
+0.01 - 1794
+0.39 - 1794
+4.72 - 2006
+8.18 - 2125
+
+
+
+I1 = 4.72
+I2 = 8.18
+
+ADC1 = 2006
+ADC2 = 2125
+
+Equations:
+
+P1 = ADC2 - ((I2 * 100 000) / P2)
+P2 = ((I2 - I1) * 100 000) / (ADC2 - ADC1)
+
+Config:
+
+adcparam 7,1844,2908,0.23,0.000
+
+-----
+
+ovalesublime-delba-heater-01:
+
+Original config:
+
+
+16:36:05.046 CMD: adcparam
+16:36:05.057 MQT: stat/ovalesublime-delba-heater-01/RESULT = {"AdcParam1":[7,1003,740,0.23,0.000]}
+
+
+16:40:11.031 MQT: stat/ovalesublime-delba-heater-01/STATUS3 = {"StatusLOG":{"SerialLog":0,"WebLog":2,"MqttLog":0,"SysLog":0,"LogHost":"","LogPort":514,"SSId":["griffinnet-zh","griffinnet-zh-ext"],"TelePeriod":30,"Resolution":"558180C0","SetOption":["0000800B","2805C80000000600003C5A0A192800000000","00008080","00006000","00004001","00000000"]}}
+
+
+
+--
+
+0.01 - 1022
+
+4.12 - 1768
+7.81 - 2133
+
+
+p2 = 1010.96
+p1 = 1360,47
+
+adcparam 7,1361,1011,0.23,0.000
+
+
+------
+
+ovalesublime-delba-heater-04:
+
+
+0.01 - 1723
+4.44 - 2011
+8.11 - 2203
+
+
+param2 = 1911,458333333
+param1 = 1778,716621253
+
+adcparam 7,1778,1911,0.23,0.000
+
+
+------
+
+ovalesublime-delba-heater-02:
+
+0.00 - 1021
+4.64 - 1664
+7.73 - 2035
+
+
+param2 = 832,884097035
+param1 = 1106,899676375
+
+
+adcparam 7,1107,832,0.23,0.000
+
+
