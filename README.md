@@ -168,7 +168,7 @@ For example, if we want to run the heater in **thermostat mode**  we need to pas
 
 ```
 {
-  "HeatMode": 0,
+  "HeatMode": 1,
   "TargetTemperature": 23
 }
 ```
@@ -179,7 +179,7 @@ We can also optionally limit the heating duration to 2 hours by passing the argu
 
 ```
 {
-  "HeatMode": 0,
+  "HeatMode": 1,
   "TargetTemperature": 23,
   "Duration": 2
 }
@@ -369,7 +369,7 @@ SetOption114 1
 
 #### Default power state - SetOption0
 
-For safety and control reasons we prefer that our relay first stats in the off state and let the software or the user later decide if heat
+For safety and control reasons we prefer that our relay first stats in th"PowerState":"off"e off state and let the software or the user later decide if heat
 should be turned on. As such: we disable this option:
 
 ```
@@ -377,15 +377,7 @@ SetOption0 0
 ```
 
 #### Boot loop control - SetOption36
-
-This feature is potentially useful in some cases, but often can cause problems and loss of configuration. As such we disable it as well:
-
-```
-SetOption36 0
-```
-
-
-#### Device recovery using fast power cycle detection - SetOption65
+"PowerState":"off"
 
 Similarly to the previous, disable this one as well:
 
@@ -534,7 +526,8 @@ and the message is something similar to:
         "TargetTemperature": 27,
         "Duration": 7,
         "HeatMode": 1,
-        "HeatLevel": 2
+        "HeatLevel": 2,
+        "PowerState":"off"
     },
     "TempUnit": "C"
 }
