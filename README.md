@@ -133,8 +133,9 @@ to the doze mode being triggered for that heater - which will happen in a round 
 
 This script exposes two Tasmota commands:
 
-**StartHeat** - this command instructs the heater to start running. The parameters and modes defined 
-via this command map to the Delba heater built in features that are normally called via IR commands.
+**SetHeat** - this command instructs the heater to perform according to the provided parameters. This is the
+command that the Home Automation platform (or other client) needs to call in order to control the heater.
+
 
 It takes the following payload:
 
@@ -147,10 +148,23 @@ It takes the following payload:
 }
 ```
 
-`HeatMode` is the only mandatory parameter, and it specifies if the heater will be running in thermostat mode
-or power mode. All other parameters are optional and context dependent. 
+Parameters:
 
-As such, if we want to run the heater in **thermostat mode**  we need to pass the following payload:
+ * `HeatMode:` it specifies the mode of operation of the heater (mantadory).
+    * 0 - OFF. Used to turn the heater off;
+    * 1 - Thermostat Mode. Maintain the temperature around the provided TargetTemperature.
+    * 2 - Power Mode. In this mode the heater does not track a specific target temperature. Instead it stays permanently on at a given power level.
+ * `TargetTemperature:` the temperature set point to keep the room at.
+ * `Duration`: a given time limit (in hours) for the heater to operate. After this time the heater turns off automatically;
+ * `HeatLevel`: the power level at which to operate. It can take one of the following values:
+    * 0 - no heating, only the fan recirculating air;
+    * 1 - half power setting (approx. 1000 Watts)
+    * 2 - full power setting (approx. 2000 Watts)
+
+
+Apart from the HeatMode, all other parameters are optional and context dependent. 
+
+For example, if we want to run the heater in **thermostat mode**  we need to pass the following payload:
 
 ```
 {
@@ -188,7 +202,6 @@ Where `HeatLevel` has the following 3 possible values:
 
 <br>
 
-**StopHeat** - commands the heater to stop. This command takes no arguments.
 
 ## Data Model
 

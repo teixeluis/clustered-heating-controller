@@ -25,7 +25,7 @@ curr_heater_power = 0
 curr_temperature = -1
 curr_heat_level = -1
 curr_duration = -1
-curr_heat_mode = 0 # 0 = Temperature; 1 = Power
+curr_heat_mode = 0 # 0 = Off; 1 = Temperature; 2 = Power
 curr_power_state = "off" #  off | fan_only | heat_low | heat_high
 
 
@@ -168,10 +168,10 @@ def set_curr_state(state)
     curr_state = state
 end
 
-def start_heat(cmd, idx, payload, payload_json)
+def set_heat(cmd, idx, payload, payload_json)
     var temperature = nil
     var duration = nil
-    var heat_mode = 1
+    var heat_mode = 0
     var heat_level = nil
 
     # parse payload
@@ -191,6 +191,10 @@ def start_heat(cmd, idx, payload, payload_json)
         if payload_json.find("HeatLevel") != nil
             heat_level = int(payload_json.find("HeatLevel"))
         end
+    else
+        tasmota.resp_cmnd_str('Missing parameters!')
+
+        return
     end
 
     if ! tasmota.get_switches()[0]
@@ -203,7 +207,22 @@ def start_heat(cmd, idx, payload, payload_json)
 
     # Set to the desired operation mode:
 
-    if  heat_mode == 0 
+    # Power off the heater:
+    if heat_mode == 0
+        tasmota.set_timer(0,/->set_heater_state(0))
+
+        # Only turn off if the power is on:
+        if tasmota.get_switches()[0]
+            tasmota.set_timer(50, /->toggle_power())
+        end
+
+        curr_heat_mode = heat_mode
+
+        tasmota.resp_cmnd_done()
+
+        return
+    # Thermostat mode:
+    elif  heat_mode == 1
         if temperature == nil
             temperature = DEFAULT_TEMP
         end
@@ -211,7 +230,8 @@ def start_heat(cmd, idx, payload, payload_json)
         tasmota.set_timer(500, /->set_temperature(temperature))
 
         curr_temperature = temperature 
-    elif heat_mode == 1
+    # Power mode:
+    elif heat_mode == 2
         if heat_level == nil
             heat_level = DEFAULT_HEAT_LEVEL
         end
@@ -230,17 +250,6 @@ def start_heat(cmd, idx, payload, payload_json)
         tasmota.set_timer(15000, /->set_timer(duration))
         curr_duration = duration
     end    
-    
-    tasmota.resp_cmnd_done()
-end
-
-def stop_heat()
-    tasmota.set_timer(0,/->set_heater_state(0))
-
-    # Only turn off if the power is on:
-    if tasmota.get_switches()[0]
-        tasmota.set_timer(50, /->toggle_power())
-    end
     
     tasmota.resp_cmnd_done()
 end
@@ -554,8 +563,7 @@ end
 
 # Commands:
 
-tasmota.add_cmd('StartHeat', start_heat)
-tasmota.add_cmd('StopHeat', /-> stop_heat())
+tasmota.add_cmd('SetHeat', set_heat)
 
 # Rules:
 
