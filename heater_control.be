@@ -218,6 +218,8 @@ def set_heat(cmd, idx, payload, payload_json)
 
         curr_heat_mode = heat_mode
 
+        tasmota.cmd('TelePeriod')
+        
         tasmota.resp_cmnd_done()
 
         return
@@ -254,7 +256,9 @@ def set_heat(cmd, idx, payload, payload_json)
     if duration != nil
         tasmota.set_timer(15000, /->set_timer(duration))
         curr_duration = duration
-    end    
+    end
+
+    tasmota.cmd('TelePeriod')
     
     tasmota.resp_cmnd_done()
 end
