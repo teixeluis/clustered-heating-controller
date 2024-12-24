@@ -1,0 +1,25 @@
+21:03:54.321 on_power_report:  {"CurrentPower": 270, "RemainingPower": 4730}
+21:03:54.465 commit_heat: doing commit_heat
+21:03:54.477 MQT: cmnd/heaters/HeatRequest = { "HeatReqTime": 1725311034, "HeatReqId": "FC:B4:67:F3:73:B4", "HeatReqState": 1 }
+21:03:54.488 MQT: stat/ovalesublime-delba-heater-01/RESULT = {"POWER":"ON"}
+21:03:54.491 MQT: stat/ovalesublime-delba-heater-01/POWER = ON
+21:03:54.573 on_heat_request:  { "HeatReqTime": 1725311034, "HeatReqId": "FC:B4:67:F3:73:B4", "HeatReqState": 1 }
+21:03:55.087 MQT: cmnd/heaters/StateReport = { "Time": 1725311035, "Mac": "FC:B4:67:F3:73:B4", "State": 3}
+21:03:56.277 on_state_report:  { "Time": 1725311035, "Mac": "FC:B4:67:F3:73:B4", "State": 3}
+21:03:56.286 print_state_table: time:  1725311035 ; mac:  FC:B4:67:F3:73:B4 ; state:  3 ; order_num:  0
+21:03:56.363 request_heat: doing request_heat
+21:03:56.366 request_chill: doing request_chill
+21:03:58.135 read_power_state: unexpected power state. Please check heater!
+21:03:58.144 MQT: tele/ovalesublime-delba-heater-01/EVENT = {"event_type":"error", "detail":"heater_abnormal_state"}
+21:03:59.268 on_power_report:  {"CurrentPower": 270, "RemainingPower": 4730}
+21:04:00.136 MQT: cmnd/heaters/StateReport = { "Time": 1725311040, "Mac": "FC:B4:67:F3:73:B4", "State": 3}
+21:04:00.141 request_heat: doing request_heat
+21:04:00.145 request_chill: doing request_chill
+21:04:00.164 on_state_report:  { "Time": 1725311040, "Mac": "FC:B4:67:F3:73:B4", "State": 3}
+21:04:00.173 print_state_table: time:  1725311040 ; mac:  FC:B4:67:F3:73:B4 ; state:  3 ; order_num:  0
+21:04:04.141 request_heat: doing request_heat
+21:04:04.144 request_chill: doing request_chill
+21:04:04.259 on_power_report:  {"CurrentPower": 1498, "RemainingPower": 3502}
+21:04:05.078 MQT: cmnd/heaters/StateReport = { "Time": 1725311045, "Mac": "FC:B4:67:F3:73:B4", "State": 3}
+21:04:05.171 on_state_report:  { "Time": 1725311045, "Mac": "FC:B4:67:F3:73:B4", "State": 3}
+21:04:05.180 print_state_table: time:  1725311045 ; mac: 

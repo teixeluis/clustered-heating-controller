@@ -223,8 +223,13 @@ def set_heat(cmd, idx, payload, payload_json)
         return
     # Thermostat mode:
     elif  heat_mode == 1
-        if temperature == nil
-            temperature = DEFAULT_TEMP
+        if temperature == nil || temperature < 18 || temperature > 35
+            # If we don't have a valid current temperature, use the default:
+            if curr_temperature < 18 || curr_temperature > 35
+                temperature = DEFAULT_TEMP
+            else
+                temperature = curr_temperature
+            end
         end
 
         tasmota.set_timer(500, /->set_temperature(temperature))
